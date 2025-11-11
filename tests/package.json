@@ -1,0 +1,14 @@
+{
+  "name": "ai-studio-e2e-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for AI Studio",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.1",
+    "@types/node": "^20.10.5"
+  }
+}

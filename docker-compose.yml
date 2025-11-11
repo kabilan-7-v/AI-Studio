@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: ai-studio-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=ai-studio
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - ai-studio-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-studio-backend
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+      - JWT_SECRET=production-secret-change-this-in-real-deployment
+      - JWT_EXPIRES_IN=7d
+      - MONGODB_URI=mongodb://mongodb:27017/ai-studio
+      - UPLOAD_DIR=./uploads
+      - MAX_FILE_SIZE=10485760
+    volumes:
+      - backend-uploads:/app/uploads
+    networks:
+      - ai-studio-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-studio-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ai-studio-network
+    restart: unless-stopped
+
+volumes:
+  mongodb-data:
+  backend-uploads:
+
+networks:
+  ai-studio-network:
+    driver: bridge

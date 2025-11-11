@@ -1,0 +1,269 @@
+openapi: 3.0.3
+info:
+  title: AI Studio API
+  description: API for AI-powered fashion image generation
+  version: 1.0.0
+  contact:
+    email: support@example.com
+
+servers:
+  - url: http://localhost:3001/api
+    description: Development server
+  - url: http://localhost/api
+    description: Docker deployment
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints
+  - name: Generations
+    description: Image generation endpoints
+
+paths:
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$'
+                  example: Password123
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login to existing account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: Password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /generations:
+    post:
+      tags:
+        - Generations
+      summary: Create a new image generation
+      description: |
+        Upload an image and generate a modified version based on the prompt and style.
+        Note: This endpoint has a 20% chance of returning a 503 error to simulate model overload.
+        Clients should implement retry logic (up to 3 attempts).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - prompt
+                - style
+                - image
+              properties:
+                prompt:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+                  example: A beautiful fashion image with modern styling
+                style:
+                  type: string
+                  enum: [realistic, artistic, minimalist, vintage]
+                  example: realistic
+                image:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG or PNG, max 10MB)
+      responses:
+        '201':
+          description: Generation created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Generation'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Model overloaded (retry recommended)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Model overloaded
+
+    get:
+      tags:
+        - Generations
+      summary: Get user's recent generations
+      description: Returns the last N generations for the authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+            maximum: 50
+          description: Number of generations to return
+      responses:
+        '200':
+          description: List of generations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Generation'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT authentication token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: 123e4567-e89b-12d3-a456-426614174000
+            email:
+              type: string
+              format: email
+              example: user@example.com
+
+    Generation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+        prompt:
+          type: string
+          example: A beautiful fashion image with modern styling
+        style:
+          type: string
+          enum: [realistic, artistic, minimalist, vintage]
+          example: realistic
+        imageUrl:
+          type: string
+          format: uri
+          example: /uploads/123e4567-e89b-12d3-a456-426614174000.jpg
+        originalImageUrl:
+          type: string
+          format: uri
+          example: /uploads/123e4567-e89b-12d3-a456-426614174000.jpg
+        status:
+          type: string
+          example: completed
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00.000Z
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Validation error
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
